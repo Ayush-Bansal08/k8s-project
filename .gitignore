@@ -1,0 +1,30 @@
+# Secrets / env
+*.env
+.env
+.env.*
+*.tfvars
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# Kube / local config
+kubeconfig
+*.kubeconfig
+.kube/
+
+# Build artifacts
+bin/
+dist/
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Go
+vendor/
+
+# Node (if any tooling)
+node_modules/

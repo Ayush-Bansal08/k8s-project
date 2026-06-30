@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: hello
+  labels:
+    app: hello
+spec:
+  type: ClusterIP
+  selector:
+    app: hello
+  ports:
+    - name: http
+      port: 80 ##thats here you hit the service on port 80
+      targetPort: 80 ## thats where the service will forward the traffic to the pod on port 80
