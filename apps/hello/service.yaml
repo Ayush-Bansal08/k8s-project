@@ -10,5 +10,5 @@ spec:
     app: hello
   ports:
     - name: http
-      port: 80 ##thats here you hit the service on port 80
-      targetPort: 80 ## thats where the service will forward the traffic to the pod on port 80
+      port: 80
+      targetPort: 80
