@@ -3,7 +3,7 @@ apiVersion: kind.x-k8s.io/v1alpha4
 name: idp
 nodes:
   - role: control-plane
-    # Label this node so the ingress controller knows it can run here
+    # Label this node so he ingress controller knows it can run here
     kubeadmConfigPatches:
       - |
         kind: InitConfiguration
