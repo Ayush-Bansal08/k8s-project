@@ -1,0 +1,18 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: frontend
+spec:
+  scaleTargetRef:              # WHICH workload to scale
+    apiVersion: apps/v1
+    kind: Deployment
+    name: frontend
+  minReplicas: 1              # never fewer than 1 pod
+  maxReplicas: 10             # never more than 10 pods
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 50   # aim to keep each pod at ~50% CPU
