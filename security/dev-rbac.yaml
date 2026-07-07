@@ -1,0 +1,32 @@
+# 1. THE IDENTITY — a "dev" ServiceAccount (the app/user's badge)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dev
+  namespace: default
+---
+# 2. THE PERMISSIONS ("WHAT") — read-only view of common resources in "default"
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: dev-viewer
+  namespace: default
+rules:
+  - apiGroups: ["", "apps"]                    # "" = core (pods, services); "apps" = deployments
+    resources: ["pods", "services", "deployments"]
+    verbs: ["get", "list", "watch"]            # read-only: can LOOK, cannot change/delete
+---
+# 3. THE BINDING ("WHO") — grant the dev-viewer Role to the dev ServiceAccount
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dev-viewer-binding
+  namespace: default
+subjects:
+  - kind: ServiceAccount
+    name: dev
+    namespace: default
+roleRef:
+  kind: Role
+  name: dev-viewer
+  apiGroup: rbac.authorization.k8s.io
