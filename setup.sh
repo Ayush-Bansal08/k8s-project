@@ -44,6 +44,19 @@ helm upgrade --install loki grafana/loki-stack \
   --namespace monitoring --create-namespace \
   --set promtail.enabled=true --set loki.persistence.enabled=false
 
+echo "==> [7/7] Installing the security stack (Kyverno + Falco)..."
+helm repo add kyverno https://kyverno.github.io/kyverno/ >/dev/null 2>&1 || true
+helm repo add falcosecurity https://falcosecurity.github.io/charts >/dev/null 2>&1 || true
+helm repo update >/dev/null
+helm upgrade --install kyverno kyverno/kyverno --namespace kyverno --create-namespace
+helm upgrade --install falco falcosecurity/falco --namespace falco --create-namespace \
+  --set driver.kind=modern_ebpf --set tty=true
+
+echo "==> Applying Kyverno security policies..."
+kubectl wait --for=condition=available --timeout=180s \
+  deployment/kyverno-admission-controller -n kyverno || true
+kubectl apply -f "$REPO_ROOT/security/" || true
+
 echo ""
 echo "======================================================================"
 echo " DONE! Your platform is rebuilt. Access it with these port-forwards:"
