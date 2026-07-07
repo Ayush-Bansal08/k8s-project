@@ -1,0 +1,7 @@
+apiVersion: platform.myproject.io/v1
+kind: PreviewEnvironment
+metadata:
+  name: pr-42
+spec:
+  prNumber: 42
+  image: nginx:1.27
