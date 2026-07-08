@@ -1,0 +1,16 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: delay-frontend
+  namespace: default
+spec:
+  action: delay           # what: add network latency
+  mode: all               # apply to ALL matching pods
+  selector:               # which pods:
+    namespaces:
+      - default
+    labelSelectors:
+      app: frontend        # the shop's frontend
+  delay:
+    latency: "2s"          # add 2 seconds of delay to its traffic
+  duration: "60s"          # auto-recover after 60 seconds

@@ -1,0 +1,13 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: kill-frontend
+  namespace: default
+spec:
+  action: pod-kill        # what to do: kill pods
+  mode: one               # how many: just ONE matching pod
+  selector:               # WHICH pods to target
+    namespaces:
+      - default
+    labelSelectors:
+      app: frontend        # the shop's frontend
