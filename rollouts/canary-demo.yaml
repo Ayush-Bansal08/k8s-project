@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout                    # like a Deployment, but with progressive delivery
+metadata:
+  name: canary-demo
+spec:
+  replicas: 4
+  strategy:
+    canary:                      # use the CANARY strategy and it is different than blue green strategy
+      steps:
+        - setWeight: 25          # 1. send 25% of traffic to the new version
+        - pause: {}              # 2. PAUSE — wait for you to approve (manual gate)
+        - setWeight: 50          # 3. bump to 50%
+        - pause: { duration: 30s }   # 4. auto-wait 30s, then continue
+        - setWeight: 75          # 5. bump to 75%
+        - pause: { duration: 30s }   # 6. wait 30s, then go to 100%
+  selector:
+    matchLabels:
+      app: canary-demo
+  template:                      # the pod blueprint (same as a Deployment)
+    metadata:
+      labels:
+        app: canary-demo
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27      # <-- VERSION 1 (the starting version)
+          ports:
+            - containerPort: 80

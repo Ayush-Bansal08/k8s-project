@@ -1,0 +1,15 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: podinfo-canary
+  namespace: default
+  labels:
+    release: monitoring       # <-- CRITICAL: so YOUR Prometheus picks it up
+spec:
+  selector:
+    matchLabels:
+      app: podinfo-canary      # <-- which Service to scrape (by label)
+  endpoints:
+    - port: http               # <-- the Service's NAMED port (from service.yaml)
+      path: /metrics           # <-- where podinfo exposes metrics
+      interval: 15s            # <-- scrape every 15 seconds

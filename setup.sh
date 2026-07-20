@@ -57,6 +57,14 @@ kubectl wait --for=condition=available --timeout=180s \
   deployment/kyverno-admission-controller -n kyverno || true
 kubectl apply -f "$REPO_ROOT/security/" || true
 
+echo "==> Installing Chaos Mesh (resilience testing)..."
+helm repo add chaos-mesh https://charts.chaos-mesh.org >/dev/null 2>&1 || true
+helm repo update >/dev/null
+helm upgrade --install chaos-mesh chaos-mesh/chaos-mesh \
+  --namespace chaos-mesh --create-namespace \
+  --set chaosDaemon.runtime=containerd \
+  --set chaosDaemon.socketPath=/run/containerd/containerd.sock
+
 echo ""
 echo "======================================================================"
 echo " DONE! Your platform is rebuilt. Access it with these port-forwards:"

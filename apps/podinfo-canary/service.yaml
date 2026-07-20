@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: podinfo-canary
+  namespace: default
+  labels:
+    app: podinfo-canary
+spec:
+  selector:
+    app: podinfo-canary
+  ports:
+    - name: http           # <-- the port NAME matters (ServiceMonitor uses it later)
+      port: 9898
+      targetPort: 9898

@@ -40,6 +40,10 @@ spec:
           spec:
             description: spec defines the desired state of PreviewEnvironment
             properties:
+              image:
+                description: image is the container image to deploy (defaults to nginx:1.27
+                  if empty).
+                type: string
               prNumber:
                 description: prNumber is the pull-request number this preview environment
                   is for.
