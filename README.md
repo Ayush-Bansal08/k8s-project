@@ -1,147 +1,171 @@
-<div align="center">
-<img src="docs/imgs/logo.png" width="200">
+# ☸️ Internal Developer Platform on Kubernetes
 
-[![GitHub Release][release-img]][release]
-[![Test][test-img]][test]
-[![Go Report Card][go-report-img]][go-report]
-[![License: Apache-2.0][license-img]][license]
-[![GitHub Downloads][github-downloads-img]][release]
-![Docker Pulls][docker-pulls]
+> A production-grade platform that runs **any** containerized microservice app —
+> auto-deploying it via GitOps, monitoring it, securing it, scaling it, and
+> **extending Kubernetes itself** with a custom Operator.
 
-[📖 Documentation][docs]
-</div>
+**🌍 Live demo:** [https://ayush-idp.duckdns.org](https://ayush-idp.duckdns.org) — running on a cloud k3s cluster with real Let's Encrypt TLS 🔒
+*(the demo VM is stopped when idle to control cost — happy to bring it up on request)*
 
-Trivy ([pronunciation][pronunciation]) is a comprehensive and versatile security scanner.
-Trivy has *scanners* that look for security issues, and *targets* where it can find those issues.
+![Kubernetes](https://img.shields.io/badge/Kubernetes-k3s%20%7C%20kind-326CE5?logo=kubernetes&logoColor=white)
+![GitOps](https://img.shields.io/badge/GitOps-ArgoCD-EF7B4D?logo=argo&logoColor=white)
+![Go](https://img.shields.io/badge/Operator-Go%20%2F%20Kubebuilder-00ADD8?logo=go&logoColor=white)
+![Observability](https://img.shields.io/badge/Observability-Prometheus%20%7C%20Grafana%20%7C%20Loki-E6522C?logo=prometheus&logoColor=white)
+![Security](https://img.shields.io/badge/DevSecOps-Trivy%20%7C%20Kyverno%20%7C%20Falco-4B32C3)
+![Cloud](https://img.shields.io/badge/Cloud-Azure%20%7C%20Let's%20Encrypt-0078D4?logo=microsoftazure&logoColor=white)
 
-Targets (what Trivy can scan):
+---
 
-- Container Image
-- Filesystem
-- Git Repository (remote)
-- Virtual Machine Image
-- Kubernetes
+## What this is
 
-Scanners (what Trivy can find there):
+Most Kubernetes projects stop at *"I deployed an app."* This one is the **platform around the app** — the system a real company builds so developers can ship safely.
 
-- OS packages and software dependencies in use (SBOM)
-- Known vulnerabilities (CVEs)
-- IaC issues and misconfigurations
-- Sensitive information and secrets
-- Software licenses
+The demo workload is **Google's Online Boutique** (an 11-service polyglot microservices app) — deliberately *not written by me*. In platform engineering, **the app is the workload; the platform is the project.** To prove the platform is app-agnostic, a second unrelated app (**Podinfo**) runs on it with **zero platform changes**.
 
-Trivy supports most popular programming languages, operating systems, and platforms. For a complete list, see the [Scanning Coverage] page.
+---
 
-To learn more, go to the [Trivy homepage][homepage] for feature highlights, or to the [Documentation site][docs] for detailed information.
+## Architecture
 
-## Quick Start
-
-### Get Trivy
-
-Trivy is available in most common distribution channels. The full list of installation options is available in the [Installation] page. Here are a few popular examples:
-
-- `brew install trivy`
-- `docker run aquasec/trivy`
-- Download binary from <https://github.com/aquasecurity/trivy/releases/latest/>
-- See [Installation] for more
-
-Trivy is integrated with many popular platforms and applications. The complete list of integrations is available in the [Ecosystem] page. Here are a few popular examples:
-
-- [GitHub Actions](https://github.com/aquasecurity/trivy-action)
-- [Kubernetes operator](https://github.com/aquasecurity/trivy-operator)
-- [VS Code plugin](https://github.com/aquasecurity/trivy-vscode-extension)
-- See [Ecosystem] for more
-
-### Canary builds
-There are canary builds ([Docker Hub](https://hub.docker.com/r/aquasec/trivy/tags?page=1&name=canary), [GitHub](https://github.com/aquasecurity/trivy/pkgs/container/trivy/75776514?tag=canary), [ECR](https://gallery.ecr.aws/aquasecurity/trivy#canary) images and [binaries](https://github.com/aquasecurity/trivy/actions/workflows/canary.yaml)) generated with every push to the main branch.
-
-Please be aware: canary builds might have critical bugs, so they are not recommended for use in production.
-
-### General usage
-
-```bash
-trivy <target> [--scanners <scanner1,scanner2>] <subject>
+```
+                          ┌──────────────────────────────┐
+   git push ──────────────►  GitHub  (single source of truth)
+                          └──────────────┬───────────────┘
+                                         │  ArgoCD syncs (GitOps)
+                                         ▼
+   ┌──────────────────────────────────────────────────────────────────┐
+   │                       Kubernetes cluster                          │
+   │                                                                   │
+   │   Ingress (nginx) ──► Online Boutique · Podinfo · preview envs    │
+   │                                                                   │
+   │   ┌───────────────┐  ┌───────────────┐  ┌─────────────────────┐  │
+   │   │ Observability │  │   Security     │  │  Delivery           │  │
+   │   │ Prometheus    │  │  Trivy (scan)  │  │  Argo Rollouts      │  │
+   │   │ Grafana       │  │  Kyverno       │  │  canary + metric-   │  │
+   │   │ Loki          │  │  Falco         │  │  driven rollback    │  │
+   │   └───────────────┘  │  RBAC          │  └─────────────────────┘  │
+   │                      └───────────────┘                            │
+   │   ┌───────────────────────────────────────────────────────────┐  │
+   │   │ ⭐ Custom Operator (Go / Kubebuilder)                       │  │
+   │   │    PreviewEnvironment CRD → namespace + app + URL on demand │  │
+   │   └───────────────────────────────────────────────────────────┘  │
+   │                                                                   │
+   │   Resilience: HPA autoscaling · Chaos Mesh · self-healing         │
+   └──────────────────────────────────────────────────────────────────┘
+        Local: kind          │          Cloud: k3s on Azure + TLS 🔒
 ```
 
-Examples:
+---
 
-```bash
-trivy image python:3.4-alpine
+## What it does
+
+| Layer | Capability | Tools |
+|---|---|---|
+| **Run** | Runs any containerized microservice app | Kubernetes (kind / k3s) |
+| **Deploy** | `git push` → auto-deploy, with drift correction & self-heal | **ArgoCD** (GitOps) |
+| **Release** | Canary rollouts with **metric-driven auto-rollback** | **Argo Rollouts** + Prometheus analysis |
+| **Observe** | Live metrics, dashboards, centralized logs | **Prometheus · Grafana · Loki** |
+| **Secure** | Image scanning · admission policy · runtime detection · least privilege | **Trivy · Kyverno · Falco · RBAC** |
+| **Scale** | Autoscales under load, proven with load tests | **HPA** + **k6** |
+| **Survive** | Chaos experiments prove self-healing | **Chaos Mesh** |
+| **Self-service** ⭐ | On-demand ephemeral preview environments | **Custom Operator (Go/Kubebuilder)** |
+| **Go live** | Public HTTPS on a cloud cluster | **Azure · k3s · cert-manager · Let's Encrypt** |
+
+---
+
+## ⭐ The standout: a custom Kubernetes Operator
+
+I extended the Kubernetes API with my own resource type and wrote the controller that reconciles it.
+
+Apply this:
+```yaml
+apiVersion: platform.myproject.io/v1
+kind: PreviewEnvironment
+metadata:
+  name: pr-42
+spec:
+  prNumber: 42
+  image: nginx:1.27
 ```
 
-<details>
-<summary>Result</summary>
+…and the operator automatically provisions a **namespace**, a **Deployment** (from the requested image), a **Service**, and an **Ingress** at `pr-42.<domain>` — then **tears it all down** on delete via a **finalizer**.
 
-https://github.com/user-attachments/assets/af1c11e7-d9c5-48af-8e05-cb34dfd6352a
+**Built with:** Go + Kubebuilder · a `PreviewEnvironment` **CRD** · a reconciliation **controller** · **finalizer**-based cleanup · least-privilege **RBAC** markers.
 
-</details>
+📁 [`operator/`](operator/) · 📖 [`operator/README.md`](operator/README.md)
 
-```bash
-trivy fs --scanners vuln,secret,misconfig myproject/
+---
+
+## Automated canary deployments
+
+New versions roll out **gradually** (25% → 50% → 75% → 100%), and the rollout **judges itself**:
+
+```
+   deploy new version → 25% traffic → query Prometheus for success rate
+        ├─ healthy (≥95%)  → auto-promote to 100%   ✅
+        └─ degraded        → auto-rollback           🤖
 ```
 
-<details>
-<summary>Result</summary>
+Health-based rollback (`progressDeadlineAbort` + readiness probes) catches crashes; metric-based analysis (`AnalysisTemplate` → Prometheus) catches bad *behaviour*.
 
-https://github.com/user-attachments/assets/6b3894b7-77c5-4ffc-ac94-ffe6648a30dc
+📁 [`apps/podinfo-canary/`](apps/podinfo-canary/)
 
-</details>
+---
+
+## Quick start — one command
+
+The entire platform rebuilds from scratch with a single script:
 
 ```bash
-trivy k8s --report summary cluster
+bash setup.sh
 ```
 
-<details>
-<summary>Result</summary>
+Provisions: kind cluster → ingress-nginx → metrics-server → ArgoCD → all apps (via GitOps) → Prometheus/Grafana → Loki → Kyverno → Falco → Chaos Mesh.
 
-![k8s summary](docs/imgs/trivy-k8s.png)
+Then start the operator:
+```bash
+cd operator && make install && make run
+```
 
-</details>
+**Why this matters:** when the local cluster's certificates corrupted, the entire environment was rebuilt in minutes — because every layer is declarative and in Git. *Cattle, not pets.*
 
-## FAQ
+---
 
-### How to pronounce the name "Trivy"?
+## Repository structure
 
-`tri` is pronounced like **tri**gger, `vy` is pronounced like en**vy**.
+```
+├── infra/kind-config.yaml      # local cluster, as code
+├── apps/
+│   ├── online-boutique/        # the 11-service demo workload + HPA
+│   ├── podinfo/                # 2nd app — proves the platform is app-agnostic
+│   ├── podinfo-canary/         # automated canary + Prometheus analysis
+│   └── hello/                  # minimal reference app
+├── bootstrap/                  # ArgoCD Applications (GitOps, as code)
+├── operator/                   # ⭐ custom Kubernetes Operator (Go/Kubebuilder)
+├── security/                   # Kyverno policies + RBAC
+├── chaos/                      # Chaos Mesh experiments
+├── loadtest/                   # k6 load tests
+├── setup.sh                    # one-command platform bootstrap
+└── docs/
+    ├── azure-cloud-go-live-guide.md   # full cloud + HTTPS runbook
+    └── project-context.md             # original project brief
+```
 
-## Want more? Check out Aqua
+---
 
-If you liked Trivy, you will love Aqua which builds on top of Trivy to provide even more enhanced capabilities for a complete security management offering.  
-You can find a high level comparison table specific to Trivy users [here](https://trivy.dev/docs/latest/commercial/compare/).
-In addition check out the <https://aquasec.com> website for more information about our products and services.
-If you'd like to contact Aqua or request a demo, please use this form: <https://www.aquasec.com/demo>
+## Key concepts demonstrated
 
-## Community
+**Kubernetes** — Deployments · ReplicaSets · Services · Ingress · namespaces · RBAC & ServiceAccounts · CRDs & controllers · finalizers · reconciliation loops · readiness probes · resource requests & limits
 
-Trivy is an [Aqua Security][aquasec] open source project.  
-Learn about our open source work and portfolio [here][oss].  
-Contact us about any matter by opening a GitHub Discussion [here][discussions]
+**Platform engineering** — GitOps · progressive delivery · observability (metrics + logs) · policy-as-code · chaos engineering · reproducible infrastructure · cost-aware cloud operations
 
-Please ensure to abide by our [Code of Conduct][code-of-conduct] during all interactions.
+---
 
-[test]: https://github.com/aquasecurity/trivy/actions/workflows/test.yaml
-[test-img]: https://github.com/aquasecurity/trivy/actions/workflows/test.yaml/badge.svg
-[go-report]: https://goreportcard.com/report/github.com/aquasecurity/trivy
-[go-report-img]: https://goreportcard.com/badge/github.com/aquasecurity/trivy
-[release]: https://github.com/aquasecurity/trivy/releases
-[release-img]: https://img.shields.io/github/release/aquasecurity/trivy.svg?logo=github
-[github-downloads-img]: https://img.shields.io/github/downloads/aquasecurity/trivy/total?logo=github
-[docker-pulls]: https://img.shields.io/docker/pulls/aquasec/trivy?logo=docker&label=docker%20pulls%20%2F%20trivy
-[license]: https://github.com/aquasecurity/trivy/blob/main/LICENSE
-[license-img]: https://img.shields.io/badge/License-Apache%202.0-blue.svg
-[homepage]: https://trivy.dev
-[docs]: https://trivy.dev/docs/latest/
-[pronunciation]: #how-to-pronounce-the-name-trivy
-[code-of-conduct]: https://github.com/aquasecurity/community/blob/main/CODE_OF_CONDUCT.md
+## Cloud deployment
 
-[Installation]:https://trivy.dev/docs/latest/getting-started/installation/
-[Ecosystem]: https://trivy.dev/docs/latest/ecosystem/
-[Scanning Coverage]: https://trivy.dev/docs/latest/coverage/
+The platform also runs on a **cloud k3s cluster** (Azure VM) behind a real domain with **automatic Let's Encrypt TLS**. The same manifests run in both places — only the host changes.
 
-[alpine]: https://ariadne.space/2021/06/08/the-vulnerability-remediation-lifecycle-of-alpine-containers/
-[rego]: https://www.openpolicyagent.org/docs/latest/#rego
-[sigstore]: https://www.sigstore.dev/
+📖 Full step-by-step runbook: **[docs/azure-cloud-go-live-guide.md](docs/azure-cloud-go-live-guide.md)**
 
-[aquasec]: https://aquasec.com
-[oss]: https://www.aquasec.com/products/open-source-projects/
-[discussions]: https://github.com/aquasecurity/trivy/discussions
+---
+
+<sub>Built as a deep dive into platform engineering — every component was built and understood from first principles.</sub>
