@@ -28,3 +28,6 @@ vendor/
 
 # Node (if any tooling)
 node_modules/
+
+#docs`  
+docs/
