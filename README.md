@@ -8,7 +8,7 @@
 
 <br/>
 
-[**🌍 Live Demo**](https://ayush-idp.duckdns.org) · [**🎥 Video Walkthrough**](https://drive.google.com/file/d/14-x45ra9iRBMOevZ0CqfLridM_HQqiSa/view?usp=sharing) · [**📖 Cloud Runbook**](docs/azure-cloud-go-live-guide.md)
+[**🌍 Live Demo**](https://ayush-idp.duckdns.org) · [**🎥 Video Walkthrough**](https://drive.google.com/file/d/14-x45ra9iRBMOevZ0CqfLridM_HQqiSa/view?usp=sharing)
 
 *(live demo runs on an Azure k3s cluster with real Let's Encrypt TLS — the VM is stopped when idle to control cost; happy to bring it up on request)*
 
@@ -268,10 +268,7 @@ cd operator && make install && make run
 ├── security/                   # Kyverno policies + RBAC
 ├── chaos/                      # Chaos Mesh experiments
 ├── loadtest/                   # k6 load tests
-├── setup.sh                    # one-command platform bootstrap
-└── docs/
-    ├── azure-cloud-go-live-guide.md   # full cloud + HTTPS runbook
-    └── project-context.md             # original project brief
+└── setup.sh                    # one-command platform bootstrap
 ```
 
 ---
@@ -280,7 +277,7 @@ cd operator && make install && make run
 
 The platform also runs on a **k3s cluster on an Azure VM**, behind a real domain, with **automatic Let's Encrypt TLS** via cert-manager (ACME HTTP-01). Same manifests as local — only the ingress host changes.
 
-🌍 **https://ayush-idp.duckdns.org** · 📖 Full runbook: [docs/azure-cloud-go-live-guide.md](docs/azure-cloud-go-live-guide.md)
+🌍 **https://ayush-idp.duckdns.org**
 
 ---
 
