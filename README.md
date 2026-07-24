@@ -45,53 +45,77 @@ To prove the platform is **app-agnostic**, it runs two completely unrelated work
 
 ```mermaid
 flowchart TB
-    dev(["👨‍💻 Developer"]) -- "git push" --> git[("📦 GitHub<br/>single source of truth")]
-    git -. "watches & syncs" .-> argocd
-    user(["🌍 Users"]) -- "HTTPS · Let's Encrypt" --> nginx
+    dev(["👨‍💻 Developer"]) == "① git push" ==> git[("📦 GitHub<br/>single source of truth")]
+    git == "② ArgoCD pulls & syncs" ==> argocd
+    users(["🌍 Users"]) == "③ HTTPS 🔒 Let's Encrypt" ==> nginx
 
-    subgraph k8s["☸️ Kubernetes cluster — kind (local) · k3s (Azure cloud)"]
+    subgraph k8s["☸️ KUBERNETES CLUSTER — kind on my laptop · k3s on Azure"]
         direction TB
-        argocd["🐙 ArgoCD<br/>GitOps · self-heal · prune"]
-        nginx["🌐 NGINX Ingress"]
+        argocd["🐙 ArgoCD<br/><b>GitOps engine</b><br/>self-heal · drift correction"]
+        nginx["🌐 NGINX Ingress<br/><b>the front door</b>"]
 
-        subgraph workloads["Workloads"]
-            shop["🛒 Online Boutique<br/>11 microservices + HPA"]
+        subgraph apps["WORKLOADS"]
+            direction LR
+            shop["🛒 Online Boutique<br/>11 microservices"]
             pi["📟 Podinfo"]
-            prev["🔬 Preview envs<br/>pr-N.localtest.me"]
+            prev["🔬 Preview env<br/>pr-42.localtest.me"]
         end
 
-        subgraph delivery["🚀 Progressive delivery"]
-            rollouts["Argo Rollouts<br/>canary 25→50→75→100%"]
-            analysis["AnalysisRun<br/>metric-gated promotion"]
+        op["⭐ CUSTOM GO OPERATOR<br/>PreviewEnvironment CRD"]
+
+        subgraph ship["🚀 SHIP SAFELY"]
+            roll["Argo Rollouts<br/>canary 25→50→75→100%"]
         end
 
-        subgraph obs["📊 Observability"]
-            prom["Prometheus"]
-            graf["Grafana"]
-            loki["Loki"]
+        subgraph obs["📊 OBSERVE"]
+            direction LR
+            prom["Prometheus<br/>metrics"]
+            graf["Grafana<br/>dashboards"]
+            loki["Loki<br/>logs"]
         end
 
-        subgraph sec["🛡️ Security"]
+        subgraph sec["🛡️ SECURE"]
+            direction LR
             kyv["Kyverno<br/>admission policy"]
-            falco["Falco<br/>runtime detection"]
+            falco["Falco<br/>runtime alerts"]
             rbac["RBAC<br/>least privilege"]
         end
 
-        subgraph res["📈 Resilience"]
-            hpa["HPA + k6 load tests"]
-            chaos["Chaos Mesh"]
+        subgraph res["📈 SCALE & SURVIVE"]
+            direction LR
+            hpa["HPA autoscaling<br/>+ k6 load tests"]
+            chaos["Chaos Mesh<br/>failure injection"]
         end
 
-        op["⭐ Custom Operator — Go<br/>PreviewEnvironment CRD"]
-
-        argocd --> workloads
-        nginx --> workloads
-        op --> prev
-        rollouts --- analysis
-        analysis -. "queries live metrics" .-> prom
-        prom --> graf
-        loki --> graf
+        argocd == "deploys" ==> apps
+        nginx ==> apps
+        op -- "creates & tears down" --> prev
+        apps -. "metrics & logs" .-> obs
+        roll -. "asks: is the new version healthy?" .-> prom
     end
+
+    classDef person fill:#1a7f37,stroke:#116329,color:#ffffff,font-weight:bold
+    classDef gitN fill:#24292f,stroke:#57606a,color:#ffffff
+    classDef argoN fill:#EF7B4D,stroke:#c4562a,color:#ffffff,font-weight:bold
+    classDef nginxN fill:#009639,stroke:#00702b,color:#ffffff
+    classDef appN fill:#326CE5,stroke:#2557b8,color:#ffffff
+    classDef opN fill:#eac54f,stroke:#b08800,color:#24292f,font-weight:bold
+    classDef obsN fill:#E6522C,stroke:#b93815,color:#ffffff
+    classDef secN fill:#8250df,stroke:#6639ba,color:#ffffff
+    classDef resN fill:#1f883d,stroke:#116329,color:#ffffff
+    classDef zone fill:#f6f8fa,stroke:#d0d7de,color:#24292f
+
+    class dev,users person
+    class git gitN
+    class argocd,roll argoN
+    class nginx nginxN
+    class shop,pi,prev appN
+    class op opN
+    class prom,graf,loki obsN
+    class kyv,falco,rbac secN
+    class hpa,chaos resN
+    class apps,obs,ship,sec,res zone
+    style k8s fill:none,stroke:#326CE5,stroke-width:2px,stroke-dasharray:8 6,color:#326CE5
 ```
 
 **Same manifests run locally (kind) and in the cloud (k3s on Azure)** — only the host changes. That's the point of declarative infrastructure.
@@ -134,23 +158,30 @@ spec:
 
 ```mermaid
 sequenceDiagram
-    participant Dev as 👨‍💻 Developer
+    autonumber
+    actor Dev as 👨‍💻 Developer
     participant API as ☸️ Kubernetes API
-    participant Op as ⭐ Operator (Go controller)
+    participant Op as ⭐ Operator (Go)
 
-    Dev->>API: kubectl apply PreviewEnvironment pr-42
-    API-->>Op: watch event → Reconcile()
-    Op->>API: create Namespace preview-pr-42
-    Op->>API: create Deployment (image from spec)
-    Op->>API: create Service
-    Op->>API: create Ingress → pr-42.localtest.me
-    Note over Op: 🌐 isolated preview env, live at its own URL
+    rect rgba(46, 160, 67, 0.15)
+        Note over Dev,Op: 🟢 CREATE — developer asks, operator builds everything
+        Dev->>API: kubectl apply → PreviewEnvironment "pr-42"
+        API-->>Op: 🔔 watch event → Reconcile()
+        Op->>API: create Namespace preview-pr-42
+        Op->>API: create Deployment (image from spec)
+        Op->>API: create Service
+        Op->>API: create Ingress → pr-42.localtest.me
+        Note over Op: 🌐 full isolated environment,<br/>live at its own URL — in seconds
+    end
 
-    Dev->>API: kubectl delete PreviewEnvironment pr-42
-    API-->>Op: deletion blocked by finalizer
-    Op->>API: delete namespace (cascades everything)
-    Op->>API: remove finalizer → object deleted
-    Note over Op: 🧹 zero orphaned resources
+    rect rgba(248, 81, 73, 0.15)
+        Note over Dev,Op: 🔴 DELETE — the finalizer guarantees cleanup
+        Dev->>API: kubectl delete PreviewEnvironment "pr-42"
+        API-->>Op: deletion paused — finalizer present
+        Op->>API: delete namespace (everything inside cascades)
+        Op->>API: remove finalizer → object fully deleted
+        Note over Op: 🧹 zero orphaned resources,<br/>zero cost leaks
+    end
 ```
 
 This is the **same reconciliation pattern Kubernetes itself is built on** — a declared desired state, and a control loop that makes reality match it. Idempotent reconcile, finalizer-based cleanup, least-privilege RBAC generated from Kubebuilder markers.
@@ -167,12 +198,25 @@ New versions don't ship all at once — and no human decides whether they're hea
 
 ```mermaid
 flowchart LR
-    A["🚢 New version<br/>deployed"] --> B["25% of traffic<br/>to canary"]
-    B --> C{"🔬 AnalysisRun<br/>queries Prometheus:<br/>success rate ≥ 95%?"}
-    C -- "✅ healthy" --> D["Auto-promote<br/>50% → 75% → 100%"]
-    C -- "❌ degraded" --> E["🤖 Auto-rollback<br/>to last good version"]
-    D --> F["✔ Stable"]
-    E --> F
+    A["🚢 New version<br/>deployed"] ==> B["🐤 Canary gets<br/><b>25%</b> of traffic"]
+    B ==> C{"🔬 Prometheus check<br/>success rate ≥ 95%?<br/><i>4 checks, 20s apart</i>"}
+    C == "✅ healthy" ==> D["📈 Auto-promote<br/>50% → 75% → 100%"]
+    C == "❌ degraded" ==> E["🤖 Auto-rollback<br/>to last good version"]
+    D ==> F(["✔ Stable — no human involved"])
+    E ==> F
+
+    classDef start fill:#316dca,stroke:#255ab2,color:#ffffff
+    classDef canary fill:#EF7B4D,stroke:#c4562a,color:#ffffff
+    classDef check fill:#eac54f,stroke:#b08800,color:#24292f,font-weight:bold
+    classDef good fill:#1f883d,stroke:#116329,color:#ffffff
+    classDef bad fill:#cf222e,stroke:#a40e26,color:#ffffff
+    class A start
+    class B canary
+    class C check
+    class D,F good
+    class E bad
+    linkStyle 2 stroke:#1f883d,stroke-width:3px
+    linkStyle 3 stroke:#cf222e,stroke-width:3px
 ```
 
 Two independent safety nets:
@@ -189,19 +233,24 @@ Four layers, at four different stages of a container's life — no single contro
 
 ```mermaid
 flowchart LR
-    subgraph build["🔨 Build time"]
-        trivy["Trivy<br/>CVE image scanning"]
-    end
-    subgraph deploy["🚪 Deploy time"]
-        kyv["Kyverno<br/>admission policy:<br/>reject :latest tags"]
-    end
-    subgraph run["⚡ Runtime"]
-        falco["Falco<br/>detects shells in pods,<br/>suspicious syscalls"]
-    end
-    subgraph access["🔑 Access"]
-        rbac["RBAC<br/>read-only dev identity,<br/>no secrets access"]
-    end
-    build --> deploy --> run
+    img["📦 Container image"] ==> trivy["🔍 <b>TRIVY</b><br/>CVE scan<br/><i>build time</i>"]
+    trivy == "✅ no critical CVEs" ==> kyv["🚪 <b>KYVERNO</b><br/>admission policy<br/><i>deploy time</i>"]
+    kyv == "✅ policy passed" ==> pod["🟢 Running pod"]
+    bad["😈 nginx:latest<br/>untagged image"] -- "❌ REJECTED at the door" --> kyv
+    falco["👁️ <b>FALCO</b><br/>runtime detection<br/><i>shells, weird syscalls</i>"] -. "watches 24/7" .-> pod
+    rbac["🔑 <b>RBAC</b><br/>least privilege<br/><i>read-only dev identity</i>"] -. "guards the API" .-> pod
+
+    classDef stage fill:#316dca,stroke:#255ab2,color:#ffffff
+    classDef gate fill:#8250df,stroke:#6639ba,color:#ffffff,font-weight:bold
+    classDef ok fill:#1f883d,stroke:#116329,color:#ffffff
+    classDef threat fill:#ffebe9,stroke:#cf222e,color:#cf222e,font-weight:bold
+    classDef watch fill:#57606a,stroke:#424a53,color:#ffffff
+    class img stage
+    class trivy,kyv gate
+    class pod ok
+    class bad threat
+    class falco,rbac watch
+    linkStyle 3 stroke:#cf222e,stroke-width:3px
 ```
 
 The Kyverno policy is enforced live — `kubectl run test --image=nginx` (untagged → `:latest`) is **rejected at admission** and never reaches the cluster.
@@ -294,12 +343,6 @@ The platform also runs on a **k3s cluster on an Azure VM**, behind a real domain
 **This is a portfolio platform, not a production system with real users** — and I think saying that clearly matters.
 
 What it *is*: an end-to-end platform I designed, wired, broke, and fixed myself. Every tool is here for a reason I can defend, every capability is demonstrated live rather than claimed, and the whole thing rebuilds from scratch with one script.
-
-**Roadmap to productionize it** (I know exactly what's missing):
-- **Terraform** for the Azure infrastructure — the cluster is declarative; the VM should be too
-- **CI pipeline** (GitHub Actions): build → test → Trivy scan → push → GitOps image bump
-- Deploy the operator **in-cluster** (`make deploy`) with a `status` subresource and webhook-driven PR lifecycle
-- Secrets management (External Secrets / Sealed Secrets) · NetworkPolicies · multi-node HA
 
 ---
 
